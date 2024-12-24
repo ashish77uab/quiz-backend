@@ -68,15 +68,7 @@ export const signup = async (req, res) => {
       normalPassword: data.password,
       fullName: fullName,
     });
-    const wallet = await Wallet.create({
-      user: result?._id,
-    });
 
-    const updatedUser = await User.findByIdAndUpdate(
-      result?._id,
-      { wallet: wallet?._id },
-      { new: true }
-    ).select('-password -normalPassword'); // Excludes the password field
 
     const token = jwt.sign(
       { email: result.email, id: result._id, role: result.role },
@@ -85,7 +77,7 @@ export const signup = async (req, res) => {
         expiresIn: "10d",
       }
     );
-    res.status(201).json({ user: updatedUser, token });
+    res.status(201).json({ user: result, token });
   } catch (error) {
     console.log(error, 'error');
     return res.status(500).json({ message: 'Internal server error' });
@@ -124,17 +116,6 @@ export const returnUserData = async (userId) => {
       $match: { _id: mongoose.Types.ObjectId(userId) },
     },
     {
-      $lookup: {
-        from: "wallets", // Name of the collection you're joining
-        localField: "_id",
-        foreignField: "user",
-        as: "wallet",
-      },
-    },
-    {
-      $unwind: "$wallet" // Unwind the array to have a single team object
-    },
-    {
       $project: {
         password: 0,
       },
@@ -158,20 +139,6 @@ export const getUsers = async (req, res) => {
         $match: {
           role: "User",
           fullName: { $regex: searchQuery, $options: "i" },
-        },
-      },
-      {
-        $lookup: {
-          from: "wallets", // Name of the collection you're joining
-          localField: "wallet",
-          foreignField: "_id",
-          as: "wallet",
-        },
-      },
-      {
-        $unwind: {
-          path: "$wallet", // Unwind the subCategory field
-          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -200,86 +167,12 @@ export const getUsers = async (req, res) => {
 };
 export const getAllAdmin = async (req, res) => {
   try {
-    const userId = req?.user?.id
     const allAdmin = await User.aggregate([
       {
         $match: {
           role: "Admin",
         },
       },
-      {
-        $lookup: {
-          from: "messages", // Name of the Message collection
-          let: { userId: "$_id" }, // Variable to use in pipeline
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ["$sender", "$$userId"] },
-                    { $eq: ["$recipient", mongoose.Types.ObjectId(userId)] }, // Match recipient to the user
-                    { $eq: ["$read", false] }, // Only include unread messages
-                  ],
-                },
-              },
-            },
-            {
-              $sort: { createdAt: -1 }, // Sort the results by createdAt (most recent messages first)
-            },
-          ],
-          as: "unreadMessages",
-        },
-      },
-      {
-        $lookup: {
-          from: "messages",
-          let: { userId: "$_id" }, // Variable to use in pipeline (current user ID)
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    {
-                      $or: [
-                        {
-                          $and: [
-                            { $eq: ["$sender", mongoose.Types.ObjectId(userId)] }, // sender is userId
-                            { $eq: ["$recipient", "$$userId"] } // recipient is current userId
-                          ]
-                        },
-                        {
-                          $and: [
-                            { $eq: ["$sender", "$$userId"] }, // sender is current userId
-                            { $eq: ["$recipient", mongoose.Types.ObjectId(userId)] } // recipient is userId
-                          ]
-                        }
-                      ]
-                    },
-                    // { $eq: ["$read", true] } // Only include read messages
-                  ]
-                }
-              }
-            },
-            {
-              $sort: { createdAt: -1 } // Sort by createdAt (most recent first)
-            },
-            {
-              $limit: 1 // Limit to 1 (get the latest read message)
-            }
-          ],
-          as: "latestReadMessage"
-        }
-      },
-      {
-        $addFields: {
-          unreadMessageCount: { $size: "$unreadMessages" }, // Add a field to store the number of unread messages
-        },
-      },
-      {
-        $sort: { unreadMessageCount: -1 }, // Sort by the number of unread messages (descending order)
-      },
-
-
     ]);
     res.status(200).json(allAdmin);
   } catch (error) {
@@ -434,108 +327,5 @@ export const changePasswordController = async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
-export const addDepositController = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { screenShot } = req.files
-    const screenShotUrl = await uploadImageToCloudinary(screenShot?.[0], res)
-    console.log(req.body, 'req.body')
-    let transaction = await Transaction.create({ amount: Number(req.body.amount), screenShot: screenShotUrl, userId: userId, actionType: 'Deposit', status: 'Pending' });
-    return res.status(201).json(transaction);
-  } catch (error) {
-    console.log(error, 'while creating transaction error');
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-};
-export const withdrawFundController = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const user = await User.find({ panNumber: req.body.panNumber })
-    if (!user[0]) {
-      return res.status(404).json({ message: "PAN Number not matched" });
-    }
 
-    const wallet = await Wallet.findById(user[0]?.wallet)
-    if (Number(req.body.amount) === 0) {
-      return res.status(403).json({ message: "Please add more than 0 Rs amount" });
-    }
-    if (Number(wallet?.amount) < Number(req.body.amount))
-      return res.status(403).json({ message: "Insufficient funds" });
-    let transaction = await Transaction.create({ ...req.body, userId: userId, actionType: 'Withdraw', status: 'Pending' });
-    await Wallet.findOneAndUpdate(
-      { user: userId },
-      {
-        $inc: {
-          amount: -Number(req.body?.amount)      // Increase the winnings
-        }
-      },
-    );
-    return res.status(201).json(transaction);
-  } catch (error) {
-    console.log(error, 'while creating transaction error');
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-};
-export const updateWalletAmount = async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const amount = req.body.amount;
-    const updatedWallet = await Wallet.findOneAndUpdate(
-      { user: userId },
-      {
-        amount: amount
-      },
-    );
-    return res.status(200).json(updatedWallet);
-  } catch (error) {
-    console.log(error, 'while creating transaction error');
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-};
-export const getUserTransactionsController = async (req, res) => {
-  try {
-    const { limit = 10, page = 1, actionType = 'Deposit', userId } = req.query;
-
-    const pageNumber = parseInt(page);
-    const pageSize = parseInt(limit);
-
-    // Aggregation pipeline
-    const transactions = await Transaction.aggregate([
-      // Match transactions based on userId and actionType
-      {
-        $match: {
-          userId: mongoose.Types.ObjectId(userId),
-          actionType: actionType,
-        },
-      },
-      // Sort transactions by creation date (most recent first)
-      {
-        $sort: { createdAt: -1 },
-      },
-      // Pagination: Skip and limit
-      {
-        $skip: (pageNumber - 1) * pageSize,
-      },
-      {
-        $limit: pageSize,
-      },
-    ]);
-
-    // Get total count of matching transactions for pagination metadata
-    const totalTransactions = await Transaction.countDocuments({
-      userId: userId,
-      actionType: actionType,
-    });
-
-    return res.status(200).json({
-      transactions,
-      currentPage: pageNumber,
-      totalPages: Math.ceil(totalTransactions / pageSize),
-      totalTransactions,
-    });
-  } catch (error) {
-    console.error(error, 'while fetching transactions');
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-};
 

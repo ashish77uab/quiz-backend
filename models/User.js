@@ -18,10 +18,6 @@ export const userSchema = mongoose.Schema(
       enum: ["Admin", "User"],
       default: "User",
     },
-    wallet: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Wallet",
-    },
   },
   {
     timestamps: true,

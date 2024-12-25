@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Quiz from "../models/Quiz.js";
+import Result from "../models/Result.js";
 
 export const getQuizList = async (req, res) => {
   try {
@@ -99,4 +101,102 @@ export const updateQuiz = async (req, res) => {
       .json({ message: "Internal server error" });
   }
 };
+export const submitQuiz = async (req, res) => {
+  try {
+    const { quizId, questionAnswer } = req.body
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ message: "Quiz not found!" });
+    }
+    const totalMarksGot = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? quiz?.rightMark * 1 : - quiz?.negativeMark * 1), 0)
+    const rightAnswerCount = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? 1 : 0), 0)
+    const result = await Result.create({
+      quizId: quizId,
+      userId: req.user.id,
+      questionAnswer: questionAnswer,
+      totalMarksGot: totalMarksGot,
+      rightAnswerCount: rightAnswerCount,
+      wrongAnswerCount: Number(quiz?.questionCount) - rightAnswerCount,
+    });
+    if (!result)
+      return res.status(400).json({ message: "the quiz can not be submitted!" })
+    res.status(200).json(result);
+  } catch (error) {
+    console.log(error)
+    res
+      .status(500)
+      .json({ message: "Internal server error" });
+  }
+};
+
+export const quizDashboard = async (req, res) => {
+  try {
+    const quizId = req.query.quizId;
+    const userId = req.user?.id;
+
+    // Check if quizId or userId is missing
+    if (!quizId || !userId) {
+      return res.status(400).json({ message: "quizId and userId are required" });
+    }
+
+    // Aggregation pipeline to calculate rank and total participants
+    const rankData = await Result.aggregate([
+      // Match results for the specific quiz
+      {
+        $match: {
+          quizId: mongoose.Types.ObjectId(quizId),
+        },
+      },
+      // Sort by totalMarksGot in descending order
+      {
+        $sort: {
+          totalMarksGot: -1, // Highest marks first
+        },
+      },
+      // Add a rank field using $setWindowFields
+      {
+        $setWindowFields: {
+          sortBy: { totalMarksGot: -1 },
+          output: {
+            rank: {
+              $rank: {},
+            },
+          },
+        },
+      },
+      // Project only necessary fields
+      {
+        $project: {
+          userId: 1,
+          totalMarksGot: 1,
+          rank: 1,
+        },
+      },
+    ]);
+
+    // Get the user's rank and total participants
+    const userRank = rankData?.find((data) => data.userId.toString() === userId);
+
+    if (!userRank) {
+      return res.status(404).json({ message: "No rank found for this user in the given quiz" });
+    }
+
+    // Total participants in the quiz
+    const totalParticipants = rankData?.length;
+
+    // Return the user's rank, marks, and total participants
+    res.status(200).json({
+      rank: userRank.rank,
+      totalMarksGot: userRank.totalMarksGot,
+      totalParticipants,
+    });
+  } catch (error) {
+    console.error("Error fetching user's rank and total participants", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
+
 

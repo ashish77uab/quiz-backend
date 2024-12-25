@@ -18,6 +18,7 @@ export const resultSchema = mongoose.Schema(
         questionAnswer: [{
             questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question" },
             answer: { type: String },
+            userAnswer: { type: String },
             isCorrect: { type: Boolean }
         }],
 

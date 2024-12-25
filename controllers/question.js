@@ -1,49 +1,20 @@
+import mongoose from "mongoose";
 import Question from "../models/Question.js";
 import Quiz from "../models/Quiz.js";
-import Result from "../models/Result.js";
 
 export const getQuizQuestionList = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const searchQuery = req.query.search || ""; // Search query from request
-
-    const skip = (page - 1) * limit;
-
-    const matchCondition = {
-      name: { $regex: searchQuery, $options: "i" }, // Search by transactionId
-    };
-
-
-
-
-    // Count total documents
-    const totalQuizes = await Quiz.countDocuments(matchCondition);
-
-    // Fetch transactions with aggregation pipeline
-    const allQuizes = await Quiz.aggregate([
+    const quizId = req.query.quizId
+    const allQuizes = await Question.aggregate([
       {
-        $match: matchCondition, // Use dynamic match condition
-      },
-      {
-        $sort: {
-          createdAt: -1,
-
-        },
-      },
-      {
-        $skip: skip, // Skip for pagination
-      },
-      {
-        $limit: limit, // Limit for pagination
+        $match: {
+          quizId: mongoose.Types.ObjectId(quizId),
+        }
       },
     ]);
 
     res.status(200).json({
       quizes: allQuizes,
-      currentPage: page,
-      totalPages: Math.ceil(totalQuizes / limit),
-      totalQuizes,
     });
   } catch (error) {
     console.error("Error fetching quiz list", error);
@@ -117,32 +88,6 @@ export const updateQuizQuestion = async (req, res) => {
   }
 };
 
-export const submitQuizQuestion = async (req, res) => {
-  try {
-    const { quizId, questionAnswer } = req.body
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz) {
-      return res.status(404).json({ message: "Quiz not found!" });
-    }
-    const totalMarksGot = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? quiz?.rightMark * 1 : quiz?.negativeMark * 1), 0)
-    const rightAnswerCount = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? 1 : 0), 0)
-    const result = await Result.create({
-      quizId: quizId,
-      userId: req.user._id,
-      questionAnswer: questionAnswer,
-      totalMarksGot: totalMarksGot,
-      rightAnswerCount: rightAnswerCount,
-      wrongAnswerCount: Number(questionCount) - rightAnswerCount,
-    });
-    if (!result)
-      return res.status(400).json({ message: "the quiz can be submitted!" })
-    res.status(200).json(result);
-  } catch (error) {
-    console.log(error)
-    res
-      .status(500)
-      .json({ message: "Internal server error" });
-  }
-};
+
 
 

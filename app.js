@@ -3,12 +3,9 @@ import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import cors from "cors";
 import userRoutes from "./routes/users.js";
-import transactionRoutes from "./routes/transactions.js";
-import dashboardRoutes from "./routes/dashboard.js";
-import stockRoutes from "./routes/stock.js";
 import quizRoutes from "./routes/quiz.js";
 import questionRoutes from "./routes/question.js";
-import holdingRoutes from "./routes/holding.js";
+
 import upload from "./middleware/upload.js";
 import dotenv from "dotenv";
 import morgan from "morgan";
@@ -38,10 +35,6 @@ const io = new Server(server, {
 app.use("/auth", userRoutes);
 app.use("/quiz", quizRoutes);
 app.use("/question", questionRoutes);
-app.use("/stock", stockRoutes);
-app.use("/holding", holdingRoutes);
-app.use("/transactions", transactionRoutes);
-app.use("/dashboard", dashboardRoutes);
 app.post("/upload", upload.single("file"), (req, res) => {
   res.status(200).json(req.file.filename);
 });

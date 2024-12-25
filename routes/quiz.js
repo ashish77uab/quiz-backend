@@ -6,13 +6,15 @@ import {
   updateQuiz,
   deleteQuiz,
   submitQuiz,
-  quizDashboard
+  quizDashboard,
+  getQuizInfo
 } from "../controllers/quiz.js";
 import { authenticateJWT } from "../middleware/auth.js";
 
 
 
 router.get("/list", authenticateJWT, getQuizList);
+router.get("/single-quiz/:id", authenticateJWT, getQuizInfo);
 router.post("/create-quiz", authenticateJWT, createQuiz);
 router.put("/update-quiz/:id", authenticateJWT, updateQuiz);
 router.delete("/delete-quiz/:id", authenticateJWT, deleteQuiz);

@@ -26,6 +26,19 @@ export const getQuizList = async (req, res) => {
         $match: matchCondition, // Use dynamic match condition
       },
       {
+        $lookup: {
+          from: "questions", // Collection name for questions
+          localField: "_id", // Quiz `_id` field
+          foreignField: "quizId", // Question `quizId` field
+          as: "questions", // Name of the array to store matched questions
+        },
+      },
+      {
+        $addFields: {
+          isAdded: { $gt: [{ $size: "$questions" }, 0] }, // Check if `questions` array has at least one document
+        },
+      },
+      {
         $sort: {
           createdAt: -1,
 
@@ -36,6 +49,11 @@ export const getQuizList = async (req, res) => {
       },
       {
         $limit: limit, // Limit for pagination
+      },
+      {
+        $project: {
+          questions: 0, // Exclude the `questions` array from the response
+        },
       },
     ]);
 
@@ -93,6 +111,20 @@ export const updateQuiz = async (req, res) => {
     );
     if (!quiz)
       return res.status(400).json({ message: "the quiz cannot be updated!" })
+    res.status(200).json(quiz);
+  } catch (error) {
+    console.log(error)
+    res
+      .status(500)
+      .json({ message: "Internal server error" });
+  }
+};
+export const getQuizInfo = async (req, res) => {
+  try {
+    const quizId = req.params.id
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz)
+      return res.status(400).json({ message: "Not able to find quiz" })
     res.status(200).json(quiz);
   } catch (error) {
     console.log(error)

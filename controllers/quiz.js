@@ -197,13 +197,13 @@ export const quizDashboard = async (req, res) => {
         },
       },
       // Project only necessary fields
-      {
-        $project: {
-          userId: 1,
-          totalMarksGot: 1,
-          rank: 1,
-        },
-      },
+      // {
+      //   $project: {
+      //     userId: 1,
+      //     totalMarksGot: 1,
+      //     rank: 1,
+      //   },
+      // },
     ]);
 
     // Get the user's rank and total participants
@@ -221,6 +221,7 @@ export const quizDashboard = async (req, res) => {
       rank: userRank.rank,
       totalMarksGot: userRank.totalMarksGot,
       totalParticipants,
+      rankData
     });
   } catch (error) {
     console.error("Error fetching user's rank and total participants", error);

@@ -15,6 +15,7 @@ export const resultSchema = mongoose.Schema(
         totalMarksGot: { type: Number, required: true },
         rightAnswerCount: { type: Number, required: true },
         wrongAnswerCount: { type: Number, required: true },
+        questionAttempted: { type: Number, required: true },
         questionAnswer: [{
             questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question" },
             answer: { type: String },

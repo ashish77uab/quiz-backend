@@ -6,8 +6,9 @@ import {
   updateQuiz,
   deleteQuiz,
   submitQuiz,
-  quizDashboard,
-  getQuizInfo
+  quizAttemptedResult,
+  getQuizInfo,
+  quizSingleResult
 } from "../controllers/quiz.js";
 import { authenticateJWT } from "../middleware/auth.js";
 
@@ -19,7 +20,8 @@ router.post("/create-quiz", authenticateJWT, createQuiz);
 router.put("/update-quiz/:id", authenticateJWT, updateQuiz);
 router.delete("/delete-quiz/:id", authenticateJWT, deleteQuiz);
 router.post("/submit-quiz", authenticateJWT, submitQuiz);
-router.get("/dashboard", authenticateJWT, quizDashboard);
+router.get("/attempted-result", authenticateJWT, quizAttemptedResult);
+router.get("/single-result", authenticateJWT, quizSingleResult);
 
 
 

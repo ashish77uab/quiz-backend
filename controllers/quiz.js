@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Quiz from "../models/Quiz.js";
 import Result from "../models/Result.js";
+import Question from "../models/Question.js";
 
 export const getQuizList = async (req, res) => {
   try {
@@ -91,7 +92,8 @@ export const deleteQuiz = async (req, res) => {
     );
     if (!quiz)
       return res.status(400).json({ message: "the quiz cannot be deleted!" })
-    res.status(200).json(quiz);
+    await Question.deleteMany({ quizId: quizId });
+    res.status(200).json({ message: "Quiz deleted successfully" });
   } catch (error) {
     console.log(error)
     res
@@ -111,6 +113,7 @@ export const updateQuiz = async (req, res) => {
     );
     if (!quiz)
       return res.status(400).json({ message: "the quiz cannot be updated!" })
+
     res.status(200).json(quiz);
   } catch (error) {
     console.log(error)
@@ -140,10 +143,10 @@ export const submitQuiz = async (req, res) => {
     if (!quiz) {
       return res.status(404).json({ message: "Quiz not found!" });
     }
-    const totalMarksGot = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? quiz?.rightMark * 1 : - quiz?.negativeMark * 1), 0)
-    const rightAnswerCount = questionAnswer.reduce((acc, curr) => acc + (curr.isCorrect ? 1 : 0), 0)
-    const wrongAnswerCount = questionAnswer.reduce((acc, curr) => acc + (!curr.isCorrect ? 1 : 0), 0)
-    const questionAttempted = questionAnswer?.length
+    const totalMarksGot = questionAnswer?.filter((curr) => curr.isCorrect !== null)?.reduce((acc, curr) => acc + (curr.isCorrect ? quiz?.rightMark * 1 : - quiz?.negativeMark * 1), 0)
+    const rightAnswerCount = questionAnswer?.filter((curr) => curr.userAnswer !== null).reduce((acc, curr) => acc + (curr.isCorrect ? 1 : 0), 0)
+    const wrongAnswerCount = questionAnswer?.filter((curr) => curr.userAnswer !== null)?.reduce((acc, curr) => acc + (!curr.isCorrect ? 1 : 0), 0)
+    const questionAttempted = questionAnswer?.filter((item) => item?.userAnswer)?.length
     const result = await Result.create({
       quizId: quizId,
       userId: req.user.id,
@@ -293,7 +296,7 @@ export const quizSingleResult = async (req, res) => {
       // Match results for the specific quiz
       {
         $match: {
-          _id: mongoose.Types.ObjectId(resultId),
+          quizId: mongoose.Types.ObjectId(quizId),
         },
       },
       // Sort by totalMarksGot in descending order
@@ -320,6 +323,11 @@ export const quizSingleResult = async (req, res) => {
           localField: "questionAnswer.questionId", // Field in the Result collection
           foreignField: "_id", // Field in the Question collection
           as: "questionDetails", // Output array containing joined documents
+        },
+      },
+      {
+        $match: {
+          _id: mongoose.Types.ObjectId(resultId),
         },
       },
       // Add the question details back into questionAnswer

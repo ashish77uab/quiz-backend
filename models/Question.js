@@ -17,6 +17,10 @@ export const questionSchema = mongoose.Schema(
             enum: ["A", "B", "C", 'D'],
             required: true
         },
+        writtenAnswer: {
+            type: String,
+
+        },
 
     },
     {

@@ -18,9 +18,12 @@ export const resultSchema = mongoose.Schema(
         questionAttempted: { type: Number, required: true },
         questionAnswer: [{
             questionId: { type: mongoose.Schema.Types.ObjectId, ref: "Question" },
+            questionNumber: { type: Number },
             answer: { type: String },
             userAnswer: { type: String },
-            isCorrect: { type: Boolean }
+            isCorrect: { type: Boolean },
+            questionTimer: { type: String },
+            questionTime: { type: String },
         }],
 
     },

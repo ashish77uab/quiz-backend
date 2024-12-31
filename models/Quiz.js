@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import Question from "./Question.js";
 
 export const quizSchema = mongoose.Schema(
     {
@@ -20,5 +21,6 @@ export const quizSchema = mongoose.Schema(
         toObject: { virtuals: true },
     }
 );
+
 
 export default mongoose.model("Quiz", quizSchema);

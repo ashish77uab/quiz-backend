@@ -7,6 +7,7 @@ export const quizSchema = mongoose.Schema(
         questionCount: { type: Number, required: true },
         negativeMark: { type: Number, required: true },
         rightMark: { type: Number, required: true },
+        time: { type: Number, required: true },
         userId: [
             {
                 type: mongoose.Schema.Types.ObjectId,

@@ -171,6 +171,8 @@ export const quizAttemptedResult = async (req, res) => {
   try {
     const userId = req.user?.id;
     const quizId = req.query?.quizId;
+    const page = parseInt(req.query.page, 10) || 1; // Default page is 1
+    const limit = parseInt(req.query.limit, 10) || 10; // Default limit is 10
     // Check if quizId or userId is missing
     if (!userId) {
       return res.status(400).json({ message: "quizId and userId are required" });
@@ -266,14 +268,24 @@ export const quizAttemptedResult = async (req, res) => {
           questionDetails: 0, // Remove the temporary questionDetails array
         },
       },
+      {
+        $skip: (page - 1) * limit, // Skip documents for previous pages
+      },
+      {
+        $limit: limit, // Limit the number of documents per page
+      },
     ]);
 
     // Total participants in the quiz
     const totalParticipants = await Result.countDocuments({ quizId });
+    const totalData = await Result.countDocuments({ quizId, userId });
     // Return the user's rank, marks, and total participants
     res.status(200).json({
       result: rankData,
       totalParticipants,
+      currentPage: page,
+      count: totalData,
+      totalPages: Math.ceil(totalData / limit),
     });
   } catch (error) {
     console.error("Error fetching user's rank and total participants", error);

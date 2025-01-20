@@ -288,7 +288,7 @@ export const quizAttemptedResult = async (req, res) => {
       totalPages: Math.ceil(totalData / limit),
     });
   } catch (error) {
-    console.error("Error fetching user's rank and total participants", error);
+    console.error("Error fetching attempted result", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -401,15 +401,97 @@ export const quizSingleResult = async (req, res) => {
     const totalParticipants = await Result.countDocuments({ quizId });
 
     // Return the user's rank, marks, and total participants
-    res.status(200).json({
+    return res.status(200).json({
       result: rankData,
       totalParticipants,
     });
   } catch (error) {
-    console.error("Error fetching user's rank and total participants", error);
+    console.error("Error fetching user's singleResult", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+export const quizResultLeaderBoard = async (req, res) => {
+  try {
+    const quizId = req.query?.quizId;
+    const page = parseInt(req.query.page, 10) || 1; // Default page is 1
+    const limit = parseInt(req.query.limit, 10) || 10; // Default limit is 10
+    const skip = (page - 1) * limit;
+
+    // Get the total count of results for the given quiz
+    const totalResults = await Result.countDocuments({ quizId: mongoose.Types.ObjectId(quizId) });
+
+    const results = await Result.aggregate([
+      // Match results for the specified quiz
+      {
+        $match: { quizId: mongoose.Types.ObjectId(quizId) },
+      },
+      // Add a secondary field to sort by createdAt (convert createdAt to a timestamp for sorting)
+      {
+        $addFields: {
+          createdAtTimestamp: { $toLong: "$createdAt" },
+        },
+      },
+      // Sort by totalMarksGot (descending) and createdAt (ascending)
+      {
+        $sort: { totalMarksGot: -1, createdAtTimestamp: 1 },
+      },
+      // Add rank field using totalMarksGot and the timestamp-based sort
+      {
+        $setWindowFields: {
+          sortBy: { totalMarksGot: -1 }, // Top-level field for ranking
+          output: {
+            rank: {
+              $rank: {},
+            },
+          },
+        },
+      },
+      // Pagination: Skip and Limit
+      { $skip: skip },
+      { $limit: limit },
+      // Lookup user details for the userId field
+      {
+        $lookup: {
+          from: "users", // Collection name for the User model
+          localField: "userId",
+          foreignField: "_id",
+          as: "userDetails",
+        },
+      },
+      // Optionally unwind the user details if only a single user is expected
+      {
+        $unwind: "$userDetails",
+      },
+      {
+        $lookup: {
+          from: "quizzes", // Collection name for the User model
+          localField: "quizId",
+          foreignField: "_id",
+          as: "quiz",
+        },
+      },
+      // Optionally unwind the user details if only a single user is expected
+      {
+        $unwind: "$quiz",
+      },
+    ]);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalResults / limit);
+
+    return res.status(200).json({
+      result: results,
+      currentPage: page,
+      count: totalResults,
+      totalPages: totalPages,
+    });
+  } catch (error) {
+    console.error("Error fetching quiz's leaderboard ", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
 
 
 

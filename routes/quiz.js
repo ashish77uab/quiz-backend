@@ -8,7 +8,8 @@ import {
   submitQuiz,
   quizAttemptedResult,
   getQuizInfo,
-  quizSingleResult
+  quizSingleResult,
+  quizResultLeaderBoard
 } from "../controllers/quiz.js";
 import { authenticateJWT } from "../middleware/auth.js";
 
@@ -22,6 +23,7 @@ router.delete("/delete-quiz/:id", authenticateJWT, deleteQuiz);
 router.post("/submit-quiz", authenticateJWT, submitQuiz);
 router.get("/attempted-result", authenticateJWT, quizAttemptedResult);
 router.get("/single-result", authenticateJWT, quizSingleResult);
+router.get("/single-result-leaderboard", authenticateJWT, quizResultLeaderBoard);
 
 
 

@@ -2,10 +2,21 @@ import mongoose from "mongoose";
 import Question from "../models/Question.js";
 import Quiz from "../models/Quiz.js";
 
+export const getQuizQuestionInfoById = async (req, res) => {
+  try {
+    const questionId = req.query.questionId
+    const question = await Question.findById(questionId);
+
+    res.status(200).json(question);
+  } catch (error) {
+    console.error("Error fetching quiz questions", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 export const getQuizQuestionList = async (req, res) => {
   try {
     const quizId = req.query.quizId
-    const allQuizes = await Question.aggregate([
+    const allQuestions = await Question.aggregate([
       {
         $match: {
           quizId: mongoose.Types.ObjectId(quizId),
@@ -14,29 +25,30 @@ export const getQuizQuestionList = async (req, res) => {
     ]);
 
     res.status(200).json({
-      quizes: allQuizes,
+      questions: allQuestions,
     });
   } catch (error) {
-    console.error("Error fetching quiz list", error);
+    console.error("Error fetching quiz questions", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
 export const createQuizQuestion = async (req, res) => {
   try {
-    const { quizId, questions } = req.body
+    const quizId = req.query.quizId
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
       return res.status(404).json({ message: "Quiz not found!" });
     }
-    if (Number(quiz?.questionCount) !== questions?.length) {
+    const questionsLength = await Question.countDocuments({ quizId: mongoose.Types.ObjectId(quizId) });
+    console.log(questionsLength, 'questionsLength', quiz?.questionCount)
+    if (Number(quiz?.questionCount) === Number(questionsLength)) {
       return res.status(400).json({ message: `the number of questions in quiz should be ${quiz?.questionCount}!` });
     }
-    const questionArr = questions?.map((item) => ({ ...item, quizId: quizId }))
-    const questionsCreated = await Question.insertMany(questionArr);
-    if (!questionsCreated)
+    const questionCreated = await Question.create({ ...req.body, quizId: quizId });
+    if (!questionCreated)
       return res.status(400).json({ message: "the questions  cannot be created!" });
-    res.status(201).json({ questions: questionsCreated, message: 'Created successfully' });
+    res.status(201).json({ questionCreated: questionCreated, message: 'Created successfully' });
   } catch (error) {
     console.log(error, 'error creating questions')
     res
@@ -48,39 +60,22 @@ export const createQuizQuestion = async (req, res) => {
 
 export const updateQuizQuestion = async (req, res) => {
   try {
-    const { quizId, questions } = req.body;
+    const questionId = req.query.questionId;
 
     // Find the quiz by its ID
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz) {
-      return res.status(404).json({ message: "Quiz not found!" });
-    }
-
-    // Validate the question count
-    if (Number(quiz.questionCount) !== questions.length) {
-      return res
-        .status(400)
-        .json({ message: `The number of questions in the quiz should be ${quiz.questionCount}!` });
-    }
-
-    // Update the questions
-    const bulkOperations = questions.map((item) => ({
-      updateOne: {
-        filter: { quizId: quizId, _id: item._id }, // Match by quizId and question ID
-        update: { $set: { ...item } }, // Update fields from the provided data
-        upsert: true, // Insert the document if it does not exist
+    const question = await Question.findByIdAndUpdate(
+      questionId,
+      {
+        ...req.body,
       },
-    }));
+      { new: true }
+    );
+    if (!question)
+      return res.status(400).json({ message: "the question cannot be updated!" })
 
-    const result = await Question.bulkWrite(bulkOperations);
-
-    if (!result.modifiedCount && !result.upsertedCount) {
-      return res.status(400).json({ message: "No questions were updated or created!" });
-    }
-
-    res.status(200).json({
-      message: "Questions updated successfully!",
-      result,
+    return res.status(200).json({
+      message: "Question updated successfully!",
+      question,
     });
   } catch (error) {
     console.error(error);

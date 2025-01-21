@@ -69,6 +69,71 @@ export const getQuizList = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+export const getQuizListForUser = async (req, res) => {
+  try {
+    const userId = req.user.id; // User ID from request
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const searchQuery = req.query.search || ""; // Search query from request
+    const skip = (page - 1) * limit;
+    const matchCondition = {
+      name: { $regex: searchQuery, $options: "i" }, // Search by name
+    };
+
+    // Count total documents
+    const totalQuizes = await Quiz.countDocuments(matchCondition);
+
+    // Fetch quizzes with aggregation pipeline
+    const allQuizes = await Quiz.aggregate([
+      {
+        $match: matchCondition, // Use dynamic match condition
+      },
+      {
+        $lookup: {
+          from: "results", // Collection name for results
+          let: { quizId: "$_id" }, // Pass the current quiz `_id`
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ["$quizId", "$$quizId"] }, { $eq: ["$userId", mongoose.Types.ObjectId(userId)] }] } } },
+            { $limit: 1 }, // Limit to one result to check for existence
+          ],
+          as: "attempted", // Name of the array to store matched results
+        },
+      },
+      {
+        $addFields: {
+          isAttempted: { $gt: [{ $size: "$attempted" }, 0] }, // Check if `attempted` array has at least one document
+        },
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+      {
+        $skip: skip, // Skip for pagination
+      },
+      {
+        $limit: limit, // Limit for pagination
+      },
+      {
+        $project: {
+          attempted: 0, // Exclude the `attempted` array from the response
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      quizes: allQuizes,
+      currentPage: page,
+      totalPages: Math.ceil(totalQuizes / limit),
+      totalQuizes,
+    });
+  } catch (error) {
+    console.error("Error fetching quiz list", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 
 export const createQuiz = async (req, res) => {
   try {

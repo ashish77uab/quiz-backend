@@ -9,13 +9,15 @@ import {
   quizAttemptedResult,
   getQuizInfo,
   quizSingleResult,
-  quizResultLeaderBoard
+  quizResultLeaderBoard,
+  getQuizListForUser
 } from "../controllers/quiz.js";
 import { authenticateJWT } from "../middleware/auth.js";
 
 
 
 router.get("/list", authenticateJWT, getQuizList);
+router.get("/list-user", authenticateJWT, getQuizListForUser);
 router.get("/single-quiz/:id", authenticateJWT, getQuizInfo);
 router.post("/create-quiz", authenticateJWT, createQuiz);
 router.put("/update-quiz/:id", authenticateJWT, updateQuiz);

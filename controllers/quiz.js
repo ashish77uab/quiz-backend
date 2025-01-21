@@ -363,51 +363,35 @@ export const quizSingleResult = async (req, res) => {
     const quizId = req.query?.quizId;
     const userId = req.user?.id;
 
-    // Check if quizId or userId is missing
     if (!userId) {
-      return res.status(400).json({ message: " userId are required" });
+      return res.status(400).json({ message: "User ID is required" });
     }
 
-    // Aggregation pipeline to calculate rank and total participants
+    // Aggregation pipeline
     const rankData = await Result.aggregate([
-      // Match results for the specific quiz
       {
-        $match: {
-          quizId: mongoose.Types.ObjectId(quizId),
-        },
+        $match: { quizId: mongoose.Types.ObjectId(quizId) }, // Match results for the specific quiz
       },
-      // Sort by totalMarksGot in descending order
       {
-        $sort: {
-          totalMarksGot: -1, // Highest marks first
-        },
+        $sort: { totalMarksGot: -1 }, // Sort by total marks
       },
-      // Add a rank field using $setWindowFields
       {
         $setWindowFields: {
           sortBy: { totalMarksGot: -1 },
-          output: {
-            rank: {
-              $rank: {},
-            },
-          },
+          output: { rank: { $rank: {} } },
         },
       },
-      // Perform a $lookup to populate questionId in questionAnswer
       {
         $lookup: {
-          from: "questions", // Name of the collection to join
-          localField: "questionAnswer.questionId", // Field in the Result collection
-          foreignField: "_id", // Field in the Question collection
-          as: "questionDetails", // Output array containing joined documents
+          from: "questions",
+          localField: "questionAnswer.questionId",
+          foreignField: "_id",
+          as: "questionDetails",
         },
       },
       {
-        $match: {
-          _id: mongoose.Types.ObjectId(resultId),
-        },
+        $match: { _id: mongoose.Types.ObjectId(resultId) }, // Match the specific resultId
       },
-      // Add the question details back into questionAnswer
       {
         $addFields: {
           questionAnswer: {
@@ -439,42 +423,67 @@ export const quizSingleResult = async (req, res) => {
       },
       {
         $lookup: {
-          from: "quizzes", // Name of the Quiz collection
-          localField: "quizId", // Field in the Result collection
-          foreignField: "_id", // Field in the Quiz collection
-          as: "quizDetails", // Output array containing joined documents
+          from: "quizzes",
+          localField: "quizId",
+          foreignField: "_id",
+          as: "quizDetails",
         },
       },
-      // Flatten the quizDetails array (if only one document is expected)
       {
-        $unwind: {
-          path: "$quizDetails",
-          preserveNullAndEmptyArrays: true, // In case no match is found
+        $unwind: { path: "$quizDetails", preserveNullAndEmptyArrays: true },
+      },
+      {
+        $project: { questionDetails: 0 },
+      },
+    ]);
+
+    // Calculate the percentage of users who answered each question correctly
+    const questionStatistics = await Result.aggregate([
+      {
+        $match: { quizId: mongoose.Types.ObjectId(quizId) }, // Match the specific quiz
+      },
+      {
+        $unwind: "$questionAnswer", // Deconstruct the questionAnswer array
+      },
+      {
+        $group: {
+          _id: "$questionAnswer.questionId", // Group by questionId
+          totalAnswers: { $sum: 1 }, // Count total answers for the question
+          correctAnswers: {
+            $sum: { $cond: [{ $eq: ["$questionAnswer.isCorrect", true] }, 1, 0] },
+          },
         },
       },
-      // Optionally project fields if needed
       {
         $project: {
-          questionDetails: 0, // Remove the temporary questionDetails array
+          _id: 1,
+          totalAnswers: 1,
+          correctAnswers: 1,
+          percentageCorrect: {
+            $cond: [
+              { $gt: ["$totalAnswers", 0] },
+              { $multiply: [{ $divide: ["$correctAnswers", "$totalAnswers"] }, 100] },
+              0,
+            ],
+          },
         },
       },
     ]);
 
-
-
     // Total participants in the quiz
     const totalParticipants = await Result.countDocuments({ quizId });
 
-    // Return the user's rank, marks, and total participants
     return res.status(200).json({
       result: rankData,
       totalParticipants,
+      questionStatistics, // Include question statistics
     });
   } catch (error) {
-    console.error("Error fetching user's singleResult", error);
+    console.error("Error fetching quiz result:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 export const quizResultLeaderBoard = async (req, res) => {
   try {
     const quizId = req.query?.quizId;

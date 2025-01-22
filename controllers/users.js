@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Token from "../models/Token.js";
 import crypto from "crypto";
+import sha256 from "crypto-js/sha256.js";
+import axios from "axios";
 import { sendEmail, sendEmailAdminToUser, sendEmailToAdminForUserDetail } from "../SendEmail.js";
 import mongoose from "mongoose";
 
@@ -216,9 +218,7 @@ export const resetPasswordRequestController = async (req, res) => {
 };
 export const contactUsController = async (req, res) => {
   try {
-
     const { fullName, email, mobile, message } = req.body
-
     sendEmailAdminToUser(
       `This is Mail from Algotrons Team`,
       {
@@ -323,5 +323,54 @@ export const changePasswordController = async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const paymentStatus = async (req, res) => {
+  try {
+    const data = req.body
+    const status = data.code
+    const merchantId = data.merchantId
+    const transactionId = data.transactionId
+    console.log(req.body, 'req.body')
+    const st =
+      `/pg/v1/status/${merchantId}/${transactionId}` +
+      process.env.SALT_KEY;
+    // console.log(st)
+    const dataSha256 = sha256(st);
+
+    const checksum = dataSha256 + "###" + process.env.SALT_INDEX;
+
+
+
+
+    const options = {
+      method: "GET",
+      url: `https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/status/${merchantId}/${transactionId}`,
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+        "X-VERIFY": checksum,
+        "X-MERCHANT-ID": `${merchantId}`,
+      },
+    };
+
+    // CHECK PAYMENT STATUS
+    const response = await axios.request(options);
+    console.log(response, 'response')
+    console.log("r===", response.data.code);
+
+
+    if (response.data.code == "PAYMENT_SUCCESS") {
+      return res.redirect("http://localhost:3000/payment-status?isSuccess=true");
+    }
+    else {
+      return res.redirect("http://localhost:3000/payment-status?isSuccess=false");
+    }
+  } catch (error) {
+    console.log(error)
+    return res.status(500).json({ message: 'Error in payment api' });
+  }
+
+
+}
 
 

@@ -11,6 +11,7 @@ import {
   getUserById,
   changePasswordController,
   contactUsController,
+  paymentStatus
 } from "../controllers/users.js";
 import { authenticateJWT } from "../middleware/auth.js";
 
@@ -24,6 +25,7 @@ router.get("/all-users", authenticateJWT, getUsers);
 router.get("/single-user", authenticateJWT, getUserById);
 router.get("/all-admin", authenticateJWT, getAllAdmin);
 router.post("/contact-us", contactUsController);
+router.post("/phonepe/status/:transactionId", paymentStatus);
 
 
 export default router;

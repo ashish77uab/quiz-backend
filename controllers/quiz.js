@@ -12,37 +12,34 @@ export const getQuizList = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const matchCondition = {
-      name: { $regex: searchQuery, $options: "i" }, // Search by transactionId
+      name: { $regex: searchQuery, $options: "i" }, // Search by quiz name
     };
 
-
-
-
-    // Count total documents
+    // Count total quizzes
     const totalQuizes = await Quiz.countDocuments(matchCondition);
 
-    // Fetch transactions with aggregation pipeline
+    // Fetch quizzes with additional data
     const allQuizes = await Quiz.aggregate([
       {
         $match: matchCondition, // Use dynamic match condition
       },
       {
         $lookup: {
-          from: "questions", // Collection name for questions
+          from: "results", // Collection name for results
           localField: "_id", // Quiz `_id` field
-          foreignField: "quizId", // Question `quizId` field
-          as: "questions", // Name of the array to store matched questions
+          foreignField: "quizId", // Result `quizId` field
+          as: "results", // Name of the array to store matched results
         },
       },
       {
         $addFields: {
-          isAdded: { $gt: [{ $size: "$questions" }, 0] }, // Check if `questions` array has at least one document
+          totalUsersAttempted: { $size: { $setUnion: "$results.userId" } }, // Count distinct user IDs
+          isAdded: { $gt: [{ $size: "$results" }, 0] }, // Check if the quiz has any results
         },
       },
       {
         $sort: {
-          createdAt: -1,
-
+          createdAt: -1, // Sort by creation date
         },
       },
       {
@@ -54,6 +51,7 @@ export const getQuizList = async (req, res) => {
       {
         $project: {
           questions: 0, // Exclude the `questions` array from the response
+          results: 0, // Exclude the `results` array from the response
         },
       },
     ]);
@@ -69,6 +67,7 @@ export const getQuizList = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 export const getQuizListForUser = async (req, res) => {
   try {
     const userId = req.user.id; // User ID from request

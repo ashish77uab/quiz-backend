@@ -469,6 +469,18 @@ export const quizSingleResult = async (req, res) => {
         },
       },
     ]);
+    const quizStatistics = await Result.aggregate([
+      {
+        $match: { quizId: mongoose.Types.ObjectId(quizId) },
+      },
+      {
+        $group: {
+          _id: null, // No grouping by field, calculate stats for the whole quiz
+          highestMark: { $max: "$totalMarksGot" },
+          averageScore: { $avg: "$totalMarksGot" },
+        },
+      },
+    ]);
 
     // Total participants in the quiz
     const totalParticipants = await Result.countDocuments({ quizId });
@@ -477,6 +489,7 @@ export const quizSingleResult = async (req, res) => {
       result: rankData,
       totalParticipants,
       questionStatistics, // Include question statistics
+      quizStatistics,
     });
   } catch (error) {
     console.error("Error fetching quiz result:", error);

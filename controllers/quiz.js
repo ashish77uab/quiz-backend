@@ -99,8 +99,29 @@ export const getQuizListForUser = async (req, res) => {
         },
       },
       {
+        $lookup: {
+          from: "quizpayments", // Collection name for quiz payments
+          let: { quizId: "$_id" }, // Pass the current quiz `_id`
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$quizId", "$$quizId"] },
+                    { $eq: ["$userId", mongoose.Types.ObjectId(userId)] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 }, // Limit to one result to check for payment existence
+          ],
+          as: "payments", // Name of the array to store matched payment results
+        },
+      },
+      {
         $addFields: {
           isAttempted: { $gt: [{ $size: "$attempted" }, 0] }, // Check if `attempted` array has at least one document
+          isPaymentDone: { $gt: [{ $size: "$payments" }, 0] },
         },
       },
       {
@@ -117,6 +138,7 @@ export const getQuizListForUser = async (req, res) => {
       {
         $project: {
           attempted: 0, // Exclude the `attempted` array from the response
+          payments: 0,
         },
       },
     ]);
@@ -188,18 +210,61 @@ export const updateQuiz = async (req, res) => {
 };
 export const getQuizInfo = async (req, res) => {
   try {
-    const quizId = req.params.id
-    const quiz = await Quiz.findById(quizId);
-    if (!quiz)
-      return res.status(400).json({ message: "Not able to find quiz" })
-    res.status(200).json(quiz);
+    const quizId = req.params.id;
+    const userId = req.user?.id;
+
+    if (!mongoose.Types.ObjectId.isValid(quizId)) {
+      return res.status(400).json({ message: "Invalid quiz ID" });
+    }
+
+    const quizInfo = await Quiz.aggregate([
+      {
+        $match: { _id: mongoose.Types.ObjectId(quizId) }, // Match the specific quiz by ID
+      },
+
+      {
+        $lookup: {
+          from: "quizpayments", // Collection name for quiz payments
+          let: { quizId: "$_id" }, // Pass the quiz `_id`
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$quizId", "$$quizId"] },
+                    { $eq: ["$userId", mongoose.Types.ObjectId(userId)] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 }, // Limit to one payment record
+          ],
+          as: "payments", // Store the result in `payments` field
+        },
+      },
+      {
+        $addFields: {
+          isPaymentDone: { $gt: [{ $size: "$payments" }, 0] }, // Check if `payments` has any document
+        },
+      },
+      {
+        $project: {
+          payments: 0, // Exclude the `payments` field
+        },
+      },
+    ]);
+
+    if (!quizInfo || quizInfo.length === 0) {
+      return res.status(400).json({ message: "Quiz not found" });
+    }
+
+    res.status(200).json(quizInfo[0]); // Return the first (and only) result
   } catch (error) {
-    console.log(error)
-    res
-      .status(500)
-      .json({ message: "Internal server error" });
+    console.error("Error fetching quiz info:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
+
 export const submitQuiz = async (req, res) => {
   try {
     const { quizId, questionAnswer } = req.body

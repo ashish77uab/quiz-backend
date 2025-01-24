@@ -8,6 +8,17 @@ export const quizSchema = mongoose.Schema(
         negativeMark: { type: Number, required: true },
         rightMark: { type: Number, required: true },
         time: { type: Number, required: true },
+        isPaid: {
+            type: Boolean,
+            default: false,
+            required: true
+        },
+        amount: {
+            type: Number,
+            required: function () {
+                return this.isPaid;
+            }
+        },
         userId: [
             {
                 type: mongoose.Schema.Types.ObjectId,

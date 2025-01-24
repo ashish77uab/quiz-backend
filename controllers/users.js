@@ -7,6 +7,7 @@ import sha256 from "crypto-js/sha256.js";
 import axios from "axios";
 import { sendEmail, sendEmailAdminToUser, sendEmailToAdminForUserDetail } from "../SendEmail.js";
 import mongoose from "mongoose";
+import QuizPayment from "../models/QuizPayment.js";
 
 export const signin = async (req, res) => {
 
@@ -326,11 +327,12 @@ export const changePasswordController = async (req, res) => {
 
 export const paymentStatus = async (req, res) => {
   try {
+    const { userId, quizId } = req?.query
+    console.log(userId, quizId, 'query')
     const data = req.body
     const status = data.code
     const merchantId = data.merchantId
     const transactionId = data.transactionId
-    console.log(req.body, 'req.body')
     const st =
       `/pg/v1/status/${merchantId}/${transactionId}` +
       process.env.SALT_KEY;
@@ -358,12 +360,22 @@ export const paymentStatus = async (req, res) => {
     console.log(response, 'response')
     console.log("r===", response.data.code);
 
-
+    const payment = await QuizPayment.create({
+      userId: userId,
+      quizId: quizId,
+      merchantId: response.data.data?.merchantId,
+      merchantTransactionId: response.data.data?.merchantTransactionId,
+      transactionId: response.data.data?.transactionId,
+      statusCode: response.data.code,
+      amount: response.data.data?.amount / 100
+    })
+    if (!payment)
+      return res.status(400).json({ message: "the payment  cannot be created!" });
     if (response.data.code == "PAYMENT_SUCCESS") {
-      return res.redirect("http://localhost:3000/payment-status?isSuccess=true");
+      return res.redirect(`http://localhost:3000/quiz-join/${quizId}?isSuccess=true`);
     }
     else {
-      return res.redirect("http://localhost:3000/payment-status?isSuccess=false");
+      return res.redirect(`http://localhost:3000/quiz-join/${quizId}?isSuccess=false`);
     }
   } catch (error) {
     console.log(error)

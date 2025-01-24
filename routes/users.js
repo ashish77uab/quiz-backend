@@ -25,7 +25,7 @@ router.get("/all-users", authenticateJWT, getUsers);
 router.get("/single-user", authenticateJWT, getUserById);
 router.get("/all-admin", authenticateJWT, getAllAdmin);
 router.post("/contact-us", contactUsController);
-router.post("/phonepe/status/:transactionId", paymentStatus);
+router.post("/phonepe/status", paymentStatus);
 
 
 export default router;

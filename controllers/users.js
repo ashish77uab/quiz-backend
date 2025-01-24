@@ -372,10 +372,10 @@ export const paymentStatus = async (req, res) => {
     if (!payment)
       return res.status(400).json({ message: "the payment  cannot be created!" });
     if (response.data.code == "PAYMENT_SUCCESS") {
-      return res.redirect(`http://localhost:3000/quiz-join/${quizId}?isSuccess=true`);
+      return res.redirect(`${process.env.CLIENT_URL}/quiz-join/${quizId}?isSuccess=true`);
     }
     else {
-      return res.redirect(`http://localhost:3000/quiz-join/${quizId}?isSuccess=false`);
+      return res.redirect(`${process.env.CLIENT_URL}/quiz-join/${quizId}?isSuccess=false`);
     }
   } catch (error) {
     console.log(error)
